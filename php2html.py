@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (
     QApplication, QWidget, QLabel, QPushButton, QLineEdit, QHBoxLayout, QVBoxLayout, QCheckBox, QFileDialog, QProgressBar, QTextEdit, QGridLayout, QToolButton, QFrame
 )
 from PyQt6.QtCore import Qt  # Fix: Ensure Qt is imported
+from core.convert import start_conversion
 
 # Configuration file handling
 CONFIG_FILE = "settings.ini"
@@ -224,14 +225,20 @@ class ConverterApp(QWidget):
             "deleteUncompressedFiles": "true" if self.delete_checkbox.isChecked() else "false"
         }
         save_config(self.config)
-        
-        self.log_output.append("Starting conversion...")
-        self.progress.setValue(0)
-        import time
-        for i in range(1, 101, 10):
-            time.sleep(0.1)
-            self.progress.setValue(i)
-        self.log_output.append("Conversion completed successfully!")
+
+        email_map = {"email1.txt": "email1_converted.txt", "email2.txt": "email2_converted.txt"}  # Placeholder mapping
+        start_conversion(
+            self.config["phpDir"], self.config["templateDir"], self.config["htmlDir"],
+            self.config["productName"], self.config["classesToKeep"], self.config["replaceDir"],
+            email_map, self.config["emailLinks"], self.config["deleteUncompressedFiles"] == "true"
+        )
+        # self.log_output.append("Starting conversion...")
+        # self.progress.setValue(0)
+        # import time
+        # for i in range(1, 101, 10):
+        #     time.sleep(0.1)
+        #     self.progress.setValue(i)
+        # self.log_output.append("Conversion completed successfully!")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
