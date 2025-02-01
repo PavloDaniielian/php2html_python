@@ -5,6 +5,7 @@ import zipfile
 import pathlib
 from pathlib import Path
 from typing import Dict
+from typing import List
 
 MAX_EMAILS_NUM = 7
 STR_PHP_CONTENT_START = "start of reseller site"
@@ -55,7 +56,8 @@ def create_zip(zip_path: str, directory: str):
             zipf.write(file, file.relative_to(directory))
 
 def start_conversion(php_dir: str, template_dir: str, html_dir: str, product_name: str, classes_to_keep: str,
-                      replace_dir: str, email_map: Dict[str, str], your_link: str, delete_uncompressed: bool):
+                      replace_dir: str, your_link: str, delete_uncompressed: bool,
+                      email_map: Dict[str, str], file_copy_array_0: List, file_copy_array_n: List, file_php_array_0: List, file_php_array_n: List, file_html_array_0: List, file_html_array_n: List):
     if not os.path.exists(php_dir):
         print("Error: PHP directory does not exist.")
         return

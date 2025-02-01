@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt  # Fix: Ensure Qt is imported
 from core.convert import start_conversion
+from pathlib import Path
 
 # Configuration file handling
 CONFIG_FILE = "settings.ini"
@@ -60,6 +61,24 @@ class ConverterApp(QWidget):
         self.popups = []  # Track open popups
         self.initUI()
 
+    def detect_emails(self):
+        php_dir = self.php_input.text().strip()
+        for i_email in range(MAX_EMAILS_NUM):
+            self.source_emails[i_email].setText("")
+            self.destination_emails[i_email].setText("")
+        i_email = 0
+        for entry in Path(php_dir).iterdir():
+            new_file = entry.name
+            if entry.is_dir():
+                continue
+            if "broadcast" not in new_file:
+                continue
+            self.source_emails[i_email].setText(new_file)
+            self.destination_emails[i_email].setText(f"broadcast{i_email+1}.txt")
+            i_email += 1
+            if i_email >= MAX_EMAILS_NUM:
+                break
+
     def initUI(self):
         layout = QVBoxLayout()
 
@@ -83,7 +102,7 @@ class ConverterApp(QWidget):
             edit = QLineEdit(default_path)
             browse_button = QPushButton("...")
             browse_button.setFixedWidth(30)
-            browse_button.clicked.connect(lambda: self.browse_folder(edit))
+            browse_button.clicked.connect(lambda: self.browse_folder(edit, label_text == "PHP Directory :"))
             help_button = QToolButton()
             help_button.setText("?")
             help_button.setFixedSize(20, 20)
@@ -157,6 +176,8 @@ class ConverterApp(QWidget):
             email_layout.addWidget(QLabel("====>"), i+1, 5)
             email_layout.addWidget(dest_email, i+1, 6)
         
+        self.detect_emails()
+        
         # Email Links
         email_links_layout, self.email_links_input = create_text_section("Email Links :", self.config["emailLinks"])
         
@@ -181,6 +202,7 @@ class ConverterApp(QWidget):
         progress_layout.addWidget(self.progress)
         
         # Log Output
+        self.going = QLabel("Ready to create a site")
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
         
@@ -192,6 +214,7 @@ class ConverterApp(QWidget):
         layout.addWidget(self.delete_checkbox)
         layout.addLayout(button_layout)
         layout.addLayout(progress_layout)
+        layout.addWidget(self.going)
         layout.addWidget(self.log_output)
         layout.setSpacing(10)
         
@@ -208,10 +231,12 @@ class ConverterApp(QWidget):
             popup.close()
         popup.focusOutEvent = close_popup
     
-    def browse_folder(self, line_edit):
+    def browse_folder(self, line_edit, bUpdateEmails=False):
         folder = QFileDialog.getExistingDirectory(self, "Select Directory", directory=line_edit.text())
         if folder:
             line_edit.setText(folder)
+        if bUpdateEmails:
+            self.detect_emails()
     
     def start_conversion(self):
         self.config = {
@@ -226,19 +251,30 @@ class ConverterApp(QWidget):
         }
         save_config(self.config)
 
-        email_map = {"email1.txt": "email1_converted.txt", "email2.txt": "email2_converted.txt"}  # Placeholder mapping
+        self.detect_emails()
+        email_map = {}
+        for i in range(MAX_EMAILS_NUM):
+            _in = self.source_emails[i].text().strip()
+            if not _in:
+                continue
+            _out = self.destination_emails[i].text().strip()
+            if not _out or _out == "(none)":
+                continue
+            email_map[_in] = _out
+        
+        file_copy_array_0 = [ "emails", "files", "js", "affiliates", "articles", "jv" ]
+        file_copy_array_n = [ "files_oto", "images_oto" ]
+        file_php_array_0 = [ "disclaimer", "index", "privacy", "terms", "affiliates", "jv", "dl" ]
+        file_php_array_n = [ "oto" ]
+        file_html_array_0 = [ "disclaimer", "index", "privacy", "terms", "affiliates", "jv", "thankyou", "thankyou_signup.html" ]
+        file_html_array_n = [ "oto", "thankyou_with_oto" ]
+
         start_conversion(
             self.config["phpDir"], self.config["templateDir"], self.config["htmlDir"],
             self.config["productName"], self.config["classesToKeep"], self.config["replaceDir"],
-            email_map, self.config["emailLinks"], self.config["deleteUncompressedFiles"] == "true"
+            self.config["emailLinks"], self.config["deleteUncompressedFiles"] == "true",
+            email_map, file_copy_array_0, file_copy_array_n, file_php_array_0, file_php_array_n, file_html_array_0, file_html_array_n
         )
-        # self.log_output.append("Starting conversion...")
-        # self.progress.setValue(0)
-        # import time
-        # for i in range(1, 101, 10):
-        #     time.sleep(0.1)
-        #     self.progress.setValue(i)
-        # self.log_output.append("Conversion completed successfully!")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
