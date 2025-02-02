@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt  # Fix: Ensure Qt is imported
 from core.convert import start_conversion
 from pathlib import Path
+import time
 
 # Configuration file handling
 CONFIG_FILE = "settings.ini"
@@ -198,6 +199,17 @@ class ConverterApp(QWidget):
         progress_layout = QHBoxLayout()
         progress_label = QLabel("Progress :")
         self.progress = QProgressBar()
+        self.progress.setStyleSheet("""
+            QProgressBar {
+                border-radius: 5px;
+                background-color: lightgrey;
+                text-align: center;
+                font-size: 16px;
+            }
+            QProgressBar::chunk {
+                width: 5px;
+            }
+        """)
         progress_layout.addWidget(progress_label)
         progress_layout.addWidget(self.progress)
         
@@ -251,7 +263,6 @@ class ConverterApp(QWidget):
         }
         save_config(self.config)
 
-        self.detect_emails()
         email_map = {}
         for i in range(MAX_EMAILS_NUM):
             _in = self.source_emails[i].text().strip()
@@ -262,18 +273,19 @@ class ConverterApp(QWidget):
                 continue
             email_map[_in] = _out
         
-        file_copy_array_0 = [ "emails", "files", "js", "affiliates", "articles", "jv" ]
+        file_copy_array_0 = [ "emails", "files", "images", "js", "affiliates", "articles", "jv" ]
         file_copy_array_n = [ "files_oto", "images_oto" ]
         file_php_array_0 = [ "disclaimer", "index", "privacy", "terms", "affiliates", "jv", "dl" ]
         file_php_array_n = [ "oto" ]
-        file_html_array_0 = [ "disclaimer", "index", "privacy", "terms", "affiliates", "jv", "thankyou", "thankyou_signup.html" ]
+        file_html_array_0 = [ "disclaimer", "index", "privacy", "terms", "affiliates", "jv", "thankyou", "thankyou_signup" ]
         file_html_array_n = [ "oto", "thankyou_with_oto" ]
 
         start_conversion(
             self.config["phpDir"], self.config["templateDir"], self.config["htmlDir"],
             self.config["productName"], self.config["classesToKeep"], self.config["replaceDir"],
             self.config["emailLinks"], self.config["deleteUncompressedFiles"] == "true",
-            email_map, file_copy_array_0, file_copy_array_n, file_php_array_0, file_php_array_n, file_html_array_0, file_html_array_n
+            email_map, file_copy_array_0, file_copy_array_n, file_php_array_0, file_php_array_n, file_html_array_0, file_html_array_n,
+            self, self.progress, self.going, self.log_output
         )
 
 if __name__ == "__main__":
