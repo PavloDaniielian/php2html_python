@@ -2,8 +2,9 @@ import sys
 import os
 import configparser
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QLabel, QPushButton, QLineEdit, QHBoxLayout, QVBoxLayout, QCheckBox, QFileDialog, QProgressBar, QTextEdit, QGridLayout, QToolButton, QFrame
+    QApplication, QWidget, QLabel, QPushButton, QLineEdit, QHBoxLayout, QVBoxLayout, QFrame, QCheckBox, QFileDialog, QProgressBar, QTextEdit, QGridLayout, QToolButton, QToolTip,
 )
+from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt  # Fix: Ensure Qt is imported
 from core.convert import start_conversion
 from pathlib import Path
@@ -16,14 +17,17 @@ MAX_EMAILS_NUM = 7
 def load_config():
     config = configparser.ConfigParser()
     default_settings = {
-        "phpDir": "D:/Work/Upwork/20250127/converting",
-        "templateDir": "D:/Work/Upwork/20250127/template",
-        "htmlDir": "D:/Work/Upwork/20250127/converting/_HTML RESELLERS",
+        "phpDir": "D:\\Work\\Upwork\\20250127\\converting",
+        "templateDir": "D:\\Work\\Upwork\\20250127\\template",
+        "htmlDir": "D:\\Work\\Upwork\\20250127\\converting\\_HTML RESELLERS",
         "productName": "HealthSupplementNewsletters",
         "classesToKeep": "staatliches",
-        "replaceDir": "health",
-        "emailLinks": "YOUR LINK",
-        "deleteUncompressedFiles": "false"
+        "replaceLinks": "health",
+        "emailLinksFrom": "https://www.supersalesmachine.com/",
+        "emailLinksTo": "YOUR LINK",
+        "createZipFiles": "true",
+        "zipName": "HealthSupplementNewsletters",
+        "deleteUncompressedFiles": "false",
     }
     if not os.path.exists(CONFIG_FILE):
         save_config(default_settings)
@@ -41,16 +45,22 @@ def save_config(settings):
 class HelpPopup(QWidget):
     def __init__(self, message, parent=None):
         super().__init__(parent)
-        self.setWindowFlags(Qt.WindowType.Popup)
-        #self.setFixedSize(300, 100)
-        self.setStyleSheet("background-color: lightgray; border-radius: 5px; padding: 10px;")
-        
-        layout = QVBoxLayout()
-        label = QLabel(message)
+        self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)  # Ensures no unwanted white space
+        # Apply only outer border and remove extra margins
+        self.setStyleSheet("""
+            background-color: white;
+            border: 1px solid black;  /* Ensures only outer border */
+            padding: 5px;
+        """)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)  # Removes extra margins
+        layout.setSpacing(0)  # Ensures no unwanted spacing
+        label = QLabel(message, self)
         label.setWordWrap(True)
-        label.setTextFormat(Qt.TextFormat.PlainText)  # Force plain text rendering
+        label.setTextFormat(Qt.TextFormat.PlainText)  # Ensure plain text
+        label.setStyleSheet("font-size: 14px;")  # ✅ Set font size to 14px
         layout.addWidget(label)
-        self.setLayout(layout)
 
 # Main Window Class
 class ConverterApp(QWidget):
@@ -68,6 +78,8 @@ class ConverterApp(QWidget):
             self.source_emails[i_email].setText("")
             self.destination_emails[i_email].setText("")
         i_email = 0
+        if not Path(php_dir).exists():
+            return
         for entry in Path(php_dir).iterdir():
             new_file = entry.name
             if entry.is_dir():
@@ -89,38 +101,38 @@ class ConverterApp(QWidget):
             "HTML Directory :": "This is the reseller's HTML directory where files from the \"PHP Directory\" and \"Template Directory\" are combined. This is usually located within a folder in the PHP Directory to keep things organized.",
             "Product Name :": "This will replace any instances of \"PRODUCT NAME\" in the reseller's HTML site with the one you specify. In most cases it replaces the title tag and footer text.",
             "Classes to Keep :": "This defines which custom style classes should be kept in the reseller's HTML site. For example the original h1 tag may contain custom fonts like <h1 class=\"staatliches\">Title</h1>. If \"staatliches\" is defined, then the h1 tag remains the same. If nothing is defined, then tag is stripped and becomes <h1>Title</h1>",
-            "Replace Directory :": "Defines the Amazon S3 URL to strip. Performs find and replace and only adds folder and filename download link to all thankyou*.html pages. For example \"https://supersalesmachine.s3.amazonaws.com/members/supercashsavers/file.zip\" becomes \"files/file.zip\". Reseller then uploads zip files to corresponding folders. ",
+            "Replace Links :": "Defines the Amazon S3 URL to strip. Performs find and replace and only adds folder and filename download link to all thankyou*.html pages. For example \"https://supersalesmachine.s3.amazonaws.com/members/supercashsavers/file.zip\" becomes \"files/file.zip\". Reseller then uploads zip files to corresponding folders. ",
             "Assign Emails :": "Looks for all broadcast emails in PHP Directory and allows you to choose which ones to use for reseller's site. Example if you have a series of broadcast*.txt emails, but broadcast3.txt is gift email, you can assign broadcast3.txt to not be copied over.",
-            "Email Links :": "Replaces instances of URLs that start with https://www.supersalesmachine.com... with default YOUR LINK or a custom placeholder in all emails/broadcast*.txt files. Reseller can then add their own link."
+            "Replace Email Links :": "This searches for all instances of URLs that start with a specific string, then replaces the line with YOUR LINK or a custom tag. Any email signatures from the source site will be removed. To add new signatures, simply customize the HTML template emails."
         }
 
         def create_directory_section(label_text, default_path):
-            help_message = help_messages[label_text].replace("<", "&lt;").replace(">", "&gt;")
+            help_message = help_messages[label_text]
             layout = QHBoxLayout()
             label = QLabel(label_text)
             label.setFixedWidth(110)
-            label.setToolTip(help_message)
+            label.setToolTip(help_message.replace("<", "&lt;").replace(">", "&gt;"))
             edit = QLineEdit(default_path)
             browse_button = QPushButton("...")
             browse_button.setFixedWidth(30)
-            browse_button.clicked.connect(lambda: self.browse_folder(edit, label_text == "PHP Directory :"))
+            browse_button.clicked.connect(lambda: self.browse_folder(edit))
             help_button = QToolButton()
             help_button.setText("?")
             help_button.setFixedSize(20, 20)
             help_button.clicked.connect(lambda: self.show_help(help_message, help_button))
             
             layout.addWidget(label)
+            layout.addWidget(help_button)
             layout.addWidget(edit)
             layout.addWidget(browse_button)
-            layout.addWidget(help_button)
             return layout, edit
         
         def create_text_section(label_text, default_value):
-            help_message = help_messages[label_text].replace("<", "&lt;").replace(">", "&gt;")
+            help_message = help_messages[label_text]
             layout = QHBoxLayout()
             label = QLabel(label_text)
             label.setFixedWidth(110)
-            label.setToolTip(help_message)
+            label.setToolTip(help_message.replace("<", "&lt;").replace(">", "&gt;"))
             label.setTextFormat(Qt.TextFormat.PlainText)  # Force plain text rendering
             edit = QLineEdit(default_value)
             edit.setToolTip(help_message)
@@ -130,19 +142,44 @@ class ConverterApp(QWidget):
             help_button.clicked.connect(lambda: self.show_help(help_message, help_button))
             
             layout.addWidget(label)
-            layout.addWidget(edit)
             layout.addWidget(help_button)
+            layout.addWidget(edit)
             return layout, edit
+        
+        def create_text2_section(label_text, label_text1, default_value1, label_text2, default_value2):
+            help_message = help_messages[label_text]
+            layout = QHBoxLayout()
+            label = QLabel(label_text)
+            label.setFixedWidth(110)
+            label.setToolTip(help_message)
+            label.setTextFormat(Qt.TextFormat.PlainText)  # Force plain text rendering
+            help_button = QToolButton()
+            help_button.setText("?")
+            help_button.setFixedSize(20, 20)
+            help_button.clicked.connect(lambda: self.show_help(help_message, help_button))
+            label1 = QLabel(label_text1)
+            edit1 = QLineEdit(default_value1)
+            label2 = QLabel(label_text2)
+            edit2 = QLineEdit(default_value2)
+            
+            layout.addWidget(label)
+            layout.addWidget(help_button)
+            layout.addWidget(label1)
+            layout.addWidget(edit1)
+            layout.addWidget(label2)
+            layout.addWidget(edit2)
+            return layout, edit1, edit2
         
         # PHP, Template, and HTML Directories
         php_layout, self.php_input = create_directory_section("PHP Directory :", self.config["phpDir"])
         template_layout, self.template_input = create_directory_section("Template Directory :", self.config["templateDir"])
         html_layout, self.html_input = create_directory_section("HTML Directory :", self.config["htmlDir"])
+        self.php_input.textChanged.connect(lambda: self.onChange_PhpDir())
         
         # Product Name, Classes, Replace Dir
         product_layout, self.product_input = create_text_section("Product Name :", self.config["productName"])
         classes_layout, self.classes_input = create_text_section("Classes to Keep :", self.config["classesToKeep"])
-        replace_layout, self.replace_input = create_text_section("Replace Directory :", self.config["replaceDir"])
+        replace_layout, self.replace_input = create_text_section("Replace Links :", self.config["replaceLinks"])
         
         # Assign Emails Section
         email_layout = QGridLayout()
@@ -150,41 +187,53 @@ class ConverterApp(QWidget):
         help_message = help_messages["Assign Emails :"].replace("<", "&lt;").replace(">", "&gt;")
         label = QLabel("Assign Emails :")
         label.setToolTip(help_message)
-        email_layout.addWidget(label, 0, 1, 1, 2)
+        email_layout.addWidget(label, 0, 1)
         help_button = QToolButton()
         help_button.setText("?")
         help_button.setFixedSize(20, 20)
         help_button.clicked.connect(lambda: self.show_help(help_message, help_button))
-        email_layout.addWidget(help_button, 0, 3)
+        email_layout.addWidget(help_button, 0, 2)
         
-        email_layout.addWidget(QLabel("Source Site Emails (detected)"), 0, 4)
-        email_layout.addWidget(QLabel("Client's Destination Emails (emails/*.txt)"), 0, 6)
+        email_layout.addWidget(QLabel("Source Site Emails (detected)"), 0, 3)
+        email_layout.addWidget(QLabel("Client's Destination Emails (emails/*.txt)"), 0, 5)
         self.source_emails = []
         self.destination_emails = []
-        email_layout.setColumnMinimumWidth(1, 50)
+        email_layout.setColumnMinimumWidth(1, 110)
         email_layout.setColumnMinimumWidth(2, 0)
-        email_layout.setColumnMinimumWidth(3, 0)
+        email_layout.setColumnMinimumWidth(4, 60)
         
         for i in range(MAX_EMAILS_NUM):
             email_label = QLabel(f"Email {i+1}:")
-            email_layout.addWidget(email_label, i+1, 2, 1, 2)
+            email_layout.addWidget(email_label, i+1, 1, 1, 2, Qt.AlignmentFlag.AlignRight)
             email_label.setFixedWidth(60)
             source_email = QLineEdit()
             dest_email = QLineEdit()
             self.source_emails.append(source_email)
             self.destination_emails.append(dest_email)
-            email_layout.addWidget(source_email, i+1, 4)
-            email_layout.addWidget(QLabel("====>"), i+1, 5)
-            email_layout.addWidget(dest_email, i+1, 6)
+            email_layout.addWidget(source_email, i+1, 3)
+            email_layout.addWidget(QLabel("====>"), i+1, 4, Qt.AlignmentFlag.AlignCenter)
+            email_layout.addWidget(dest_email, i+1, 5)
         
         self.detect_emails()
         
         # Email Links
-        email_links_layout, self.email_links_input = create_text_section("Email Links :", self.config["emailLinks"])
+        email_links_layout, self.email_links_from_input, self.email_links_to_input = create_text2_section("Replace Email Links :", "Search for URLs starting with", self.config["emailLinksFrom"], "Replace URLs with", self.config["emailLinksTo"])
         
-        # Checkbox
-        self.delete_checkbox = QCheckBox("Delete Uncompressed Files")
+        # zip section
+        zip_frame = QFrame(self)
+        zip_frame.setFixedSize(750, 30)
+        self.createZip_checkbox = QCheckBox("Create ZIP Files", zip_frame)
+        self.createZip_checkbox.setChecked(self.config["createZipFiles"] == "true")
+        zip_label = QLabel(f"Zip Filename:", zip_frame)
+        zip_label.move( 150, 2 )
+        self.zip_input = QLineEdit(self.config["zipName"], zip_frame)
+        self.zip_input.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.zip_input.setGeometry( 230, 0, 250, 20 )
+        zipSuffix_label = QLabel(f"_RR.zip", zip_frame)
+        zipSuffix_label.move( 483, 2 )
+        self.delete_checkbox = QCheckBox("Delete Uncompressed Files", zip_frame)
         self.delete_checkbox.setChecked(self.config["deleteUncompressedFiles"] == "true")
+        self.delete_checkbox.move( 580, 0 )
         
         # Convert Button
         button_layout = QHBoxLayout()
@@ -223,7 +272,7 @@ class ConverterApp(QWidget):
             layout.addLayout(section)
         layout.addLayout(email_layout)
         layout.addLayout(email_links_layout)
-        layout.addWidget(self.delete_checkbox)
+        layout.addWidget(zip_frame)
         layout.addLayout(button_layout)
         layout.addLayout(progress_layout)
         layout.addWidget(self.going)
@@ -231,6 +280,7 @@ class ConverterApp(QWidget):
         layout.setSpacing(10)
         
         self.setLayout(layout)
+        QToolTip.setFont( QFont("Arial",11) )
     
 
     def show_help(self, message, button):
@@ -243,12 +293,14 @@ class ConverterApp(QWidget):
             popup.close()
         popup.focusOutEvent = close_popup
     
-    def browse_folder(self, line_edit, bUpdateEmails=False):
+    def browse_folder(self, line_edit):
         folder = QFileDialog.getExistingDirectory(self, "Select Directory", directory=line_edit.text())
         if folder:
-            line_edit.setText(folder)
-        if bUpdateEmails:
-            self.detect_emails()
+            line_edit.setText(folder.replace("/","\\"))
+    
+    def onChange_PhpDir(self):
+        self.html_input.setText(self.php_input.text() + "\\_HTML RESELLERS")
+        self.detect_emails()
     
     def start_conversion(self):
         self.config = {
@@ -257,9 +309,12 @@ class ConverterApp(QWidget):
             "htmlDir": self.html_input.text(),
             "productName": self.product_input.text(),
             "classesToKeep": self.classes_input.text(),
-            "replaceDir": self.replace_input.text(),
-            "emailLinks": self.email_links_input.text(),
-            "deleteUncompressedFiles": "true" if self.delete_checkbox.isChecked() else "false"
+            "replaceLinks": self.replace_input.text(),
+            "emailLinksFrom": self.email_links_from_input.text(),
+            "emailLinksTo": self.email_links_to_input.text(),
+            "createZipFiles": "true" if self.createZip_checkbox.isChecked() else "false",
+            "deleteUncompressedFiles": "true" if self.delete_checkbox.isChecked() else "false",
+            "zipName": self.zip_input.text()
         }
         save_config(self.config)
 
@@ -282,8 +337,9 @@ class ConverterApp(QWidget):
 
         start_conversion(
             self.config["phpDir"], self.config["templateDir"], self.config["htmlDir"],
-            self.config["productName"], self.config["classesToKeep"], self.config["replaceDir"],
-            self.config["emailLinks"], self.config["deleteUncompressedFiles"] == "true",
+            self.config["productName"], self.config["classesToKeep"], self.config["replaceLinks"],
+            self.config["emailLinksFrom"], self.config["emailLinksTo"],
+            self.config["createZipFiles"]=="true", self.config["zipName"], self.config["deleteUncompressedFiles"]=="true",
             email_map, file_copy_array_0, file_copy_array_n, file_php_array_0, file_php_array_n, file_html_array_0, file_html_array_n,
             self, self.progress, self.going, self.log_output
         )

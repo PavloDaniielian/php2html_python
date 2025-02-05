@@ -237,7 +237,7 @@ def process_php_file(file_path: str, new_file_path: str, dl:int, product_name: s
         showMessage(f"Error processing PHP file {file_path} : {str(e)}")
         return False
 
-def process_email_file(file_path: str, new_file_path: str, your_link: str) -> bool:
+def process_email_file(file_path: str, new_file_path: str, email_links_from: str, email_links_to: str) -> bool:
     email_file = new_file_path[new_file_path.replace('\\','/').rfind('/')+1:]
     showGoing( f"Processing {email_file} ...")
     temp_file_path = f"{new_file_path}_temp"
@@ -253,7 +253,7 @@ def process_email_file(file_path: str, new_file_path: str, your_link: str) -> bo
                         continue
                     if "best regards" in lower_line:
                         break
-                    line = re.sub(r"https://www\.supersalesmachine\.com/\S*", your_link, line)
+                    line = re.sub(fr"{email_links_from}\S*", email_links_to, line)
                     out_file.write(line)
             temp_file = Path(temp_file_path)
             if temp_file.exists():
@@ -307,10 +307,23 @@ def create_zip(zip_path: str, directory: str, filesToZip: List[str]):
                         zipf.write(file, file.relative_to(base_dir))
                         advanceProgress()
 
-def start_conversion(php_dir: str, template_dir: str, html_dir: str, product_name: str, classes_to_keep: str,
-                      replace_dir: str, your_link: str, delete_uncompressed: bool,
+def start_conversion(php_dir: str, template_dir: str, html_dir: str,
+                      product_name: str, classes_to_keep: str,
+                      replace_dir: str,
+                      email_links_from: str, email_links_to: str,
+                      make_zip: bool, zip_name: str, delete_uncompressed: bool,
                       email_map: Dict[str, str], file_copy_array_0: List, file_copy_array_n: List, file_php_array_0: List, file_php_array_n: List, file_html_array_0: List, file_html_array_n: List,
                       mainWin: QWidget, progress: QProgressBar, going: QLineEdit, log_out: QTextEdit ):
+    if php_dir == template_dir:
+        showMessage("PHP Directory and Template Directory can not be the same.")
+        return
+    if php_dir == html_dir:
+        showMessage("PHP Directory and HTML Directory can not be the same.")
+        return
+    if template_dir == html_dir:
+        showMessage("Template Directory and HTML Directory can not be the same.")
+        return
+    
     # set global variable
     global gProgressObj
     gProgressObj = progress
@@ -354,16 +367,16 @@ def start_conversion(php_dir: str, template_dir: str, html_dir: str, product_nam
     
     # Determine oto*
     global gnProgresStepsNum, giCurProgresStep
-    gnProgresStepsNum = 2
+    gnProgresStepsNum = 2 if create_zip else 1
     oto1 = oto2 = False
     if os.path.exists(php_dir+"/oto1.php") or os.path.exists(template_dir+"/oto1.html"):
         oto1 = True
-        gnProgresStepsNum += 1
+        gnProgresStepsNum += 1 if create_zip else 0
     if os.path.exists(php_dir+"/oto2.php") or os.path.exists(template_dir+"/oto2.html"):
         oto2 = True
-        gnProgresStepsNum += 1
+        gnProgresStepsNum += 1 if create_zip else 0
     if oto1 and oto2:
-        gnProgresStepsNum += 1
+        gnProgresStepsNum += 1 if create_zip else 0
     giCurProgresStep = -1
     nextProgressStep()
 
@@ -404,7 +417,7 @@ def start_conversion(php_dir: str, template_dir: str, html_dir: str, product_nam
     for src_file, dst_file in email_map.items():
         src = os.path.join(php_dir, src_file)
         dst = os.path.join(html_dir, "emails", dst_file)
-        if not process_email_file(src, dst, your_link):
+        if not process_email_file(src, dst, email_links_from, email_links_to):
             return
     # Processing PHP files
     file_php_array = file_php_array_0.copy()
@@ -440,60 +453,62 @@ def start_conversion(php_dir: str, template_dir: str, html_dir: str, product_nam
         advanceProgress()
     
     # Zip up the html directory
-    nFilesToZip0 = file_html_array_0.__len__()
-    for sub_dir in file_copy_array_0:
-        nFilesToZip0 += get_files_count(html_dir + "/" + sub_dir)
-    file_zip_array0 = file_copy_array_0.copy()
-    for file in file_html_array_0:
-        file_zip_array0.append(file + ".html")
-    zip_file = f"{product_name.replace(' ', '')}_RR"
-    zip_filepath = html_dir + "/" + zip_file
-        # Zip up RR
-    nextProgressStep()
-    gnAllFilesNumToProcess = nFilesToZip0
-    create_zip(zip_filepath + ".zip", html_dir, file_zip_array0)
-    appendLog(f"Zipped up the html directory to {zip_file}.zip")
-        # Zip up RR1
-    nextProgressStep()
-    nFilesToZip1 = file_html_array_n.__len__()
-    for sub_dir in file_copy_array_n:
-        nFilesToZip1 += get_files_count(html_dir + "/" + sub_dir + "1")
-    gnAllFilesNumToProcess = nFilesToZip0 + nFilesToZip1
-    file_zip_array1 = file_zip_array0.copy()
-    for file in file_copy_array_n:
-        file_zip_array1.append(file + "1")
-    for file in file_html_array_n:
-        file_zip_array1.append(file + "1.html")
-    create_zip(zip_filepath + "OTO1.zip", html_dir, file_zip_array1)
-    appendLog(f"Zipped up the html directory to {zip_file}OTO1.zip")
-        # Zip up RR2
-    nextProgressStep()
-    nFilesToZip2 = file_html_array_n.__len__()
-    for sub_dir in file_copy_array_n:
-        nFilesToZip2 += get_files_count(html_dir + "/" + sub_dir + "2")
-    gnAllFilesNumToProcess = nFilesToZip0 + nFilesToZip2
-    file_zip_array2 = file_zip_array0.copy()
-    for file in file_copy_array_n:
-        file_zip_array2.append(file + "2")
-    for file in file_html_array_n:
-        file_zip_array2.append(file + "2.html")
-    create_zip(zip_filepath + "OTO2.zip", html_dir, file_zip_array2)
-    appendLog(f"Zipped up the html directory to {zip_file}OTO2.zip")
-        # Zip up RR12
-    nextProgressStep()
-    gnAllFilesNumToProcess = nFilesToZip0 + nFilesToZip1 + nFilesToZip2 + 1
-    file_zip_array12 = file_zip_array1.copy()
-    for file in file_copy_array_n:
-        file_zip_array12.append(file + "2")
-    for file in file_html_array_n:
-        file_zip_array12.append(file + "2.html")
-    file_zip_array12.append("thankyou_with_oto1_oto2.html")
-    create_zip(zip_filepath + "OTO12.zip", html_dir, file_zip_array12)
-    appendLog(f"Zipped up the html directory to {zip_file}OTO12.zip")
+    if make_zip:
+        nFilesToZip0 = file_html_array_0.__len__()
+        for sub_dir in file_copy_array_0:
+            nFilesToZip0 += get_files_count(html_dir + "/" + sub_dir)
+        file_zip_array0 = file_copy_array_0.copy()
+        for file in file_html_array_0:
+            file_zip_array0.append(file + ".html")
+        zip_file = f"{zip_name.replace(' ', '')}_RR"
+        zip_filepath = html_dir + "/" + zip_file
+            # Zip up RR
+        nextProgressStep()
+        gnAllFilesNumToProcess = nFilesToZip0
+        create_zip(zip_filepath + ".zip", html_dir, file_zip_array0)
+        appendLog(f"Zipped up the html directory to {zip_file}.zip")
+            # Zip up RR1
+        nextProgressStep()
+        nFilesToZip1 = file_html_array_n.__len__()
+        for sub_dir in file_copy_array_n:
+            nFilesToZip1 += get_files_count(html_dir + "/" + sub_dir + "1")
+        gnAllFilesNumToProcess = nFilesToZip0 + nFilesToZip1
+        file_zip_array1 = file_zip_array0.copy()
+        for file in file_copy_array_n:
+            file_zip_array1.append(file + "1")
+        for file in file_html_array_n:
+            file_zip_array1.append(file + "1.html")
+        create_zip(zip_filepath + "OTO1.zip", html_dir, file_zip_array1)
+        appendLog(f"Zipped up the html directory to {zip_file}OTO1.zip")
+            # Zip up RR2
+        nextProgressStep()
+        nFilesToZip2 = file_html_array_n.__len__()
+        for sub_dir in file_copy_array_n:
+            nFilesToZip2 += get_files_count(html_dir + "/" + sub_dir + "2")
+        gnAllFilesNumToProcess = nFilesToZip0 + nFilesToZip2
+        file_zip_array2 = file_zip_array0.copy()
+        for file in file_copy_array_n:
+            file_zip_array2.append(file + "2")
+        for file in file_html_array_n:
+            file_zip_array2.append(file + "2.html")
+        create_zip(zip_filepath + "OTO2.zip", html_dir, file_zip_array2)
+        appendLog(f"Zipped up the html directory to {zip_file}OTO2.zip")
+            # Zip up RR12
+        nextProgressStep()
+        gnAllFilesNumToProcess = nFilesToZip0 + nFilesToZip1 + nFilesToZip2 + 1
+        file_zip_array12 = file_zip_array1.copy()
+        for file in file_copy_array_n:
+            file_zip_array12.append(file + "2")
+        for file in file_html_array_n:
+            file_zip_array12.append(file + "2.html")
+        file_zip_array12.append("thankyou_with_oto1_oto2.html")
+        create_zip(zip_filepath + "OTO12.zip", html_dir, file_zip_array12)
+        appendLog(f"Zipped up the html directory to {zip_file}OTO12.zip")
 
-    # delete_uncompressed
-    if delete_uncompressed:
-        delete_uncompressed_files( html_dir )
+        # delete_uncompressed
+        if delete_uncompressed:
+            delete_uncompressed_files( html_dir )
+            appendLog(f"Deleted uncompressed files")
 
     # complete
     nextProgressStep()
