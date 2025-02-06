@@ -60,7 +60,7 @@ def showMessage(content: str, title: str = "Fail"):
     msg_box.exec()  # Show the message box
 
 
-def process_php_file(file_path: str, new_file_path: str, dl:int, product_name: str, php_title: str, classes_to_keep: List, replace_urls: List) -> bool:
+def process_php_file(file_path: str, new_file_path: str, dl:int, product_name: str, tagline: str, classes_to_keep: List, replace_urls: List) -> bool:
     php_file = file_path[file_path.rfind('\\')+1:]
     showGoing( f"Processing {php_file} ...")
     temp_file_path = f"{new_file_path}_temp"
@@ -76,8 +76,8 @@ def process_php_file(file_path: str, new_file_path: str, dl:int, product_name: s
                     for line in temp_file:
                         if STR_PHP_CONTENT_START in line:
                             break
-                        line = re.sub(r"(<title>)(.*?)(</title>)", rf"\1{php_title}\3", line, flags=re.IGNORECASE)
                         line = re.sub(r"PRODUCT NAME", product_name, line)
+                        line = re.sub(r"TAGLINE", tagline, line)
                         out_file.write(line)
                     for line in temp_file:
                         if STR_PHP_CONTENT_END in line:
@@ -237,6 +237,7 @@ def process_php_file(file_path: str, new_file_path: str, dl:int, product_name: s
                 if b_insert and temp_file:
                     for line in temp_file:
                         line = re.sub(r"PRODUCT NAME", product_name, line)
+                        line = re.sub(r"TAGLINE", tagline, line)
                         out_file.write(line)
                     temp_file.close()
         Path(temp_file_path).unlink(missing_ok=True)  # Delete temp file
@@ -441,30 +442,27 @@ def start_conversion(php_dir: str, template_dir: str, html_dir: str,
     if oto2:
         for file in file_php_array_n:
             file_php_array.append(file+"2")
-    php_title = product_name
-    if tagline.__len__():
-        php_title += " - " + tagline
     for file in file_php_array:
         src = os.path.join(php_dir, file+".php")
         if file == "dl":
             dst = os.path.join(html_dir, "thankyou.html")
-            if not process_php_file(src, dst, 0, product_name, php_title, classes_to_keep, replace_urls):
+            if not process_php_file(src, dst, 0, product_name, tagline, classes_to_keep, replace_urls):
                 return
             if oto1:
                 dst = os.path.join(html_dir, "thankyou_with_oto1.html")
-                if not process_php_file(src, dst, 1, product_name, php_title, classes_to_keep, replace_urls):
+                if not process_php_file(src, dst, 1, product_name, tagline, classes_to_keep, replace_urls):
                     return
             if oto2:
                 dst = os.path.join(html_dir, "thankyou_with_oto2.html")
-                if not process_php_file(src, dst, 2, product_name, php_title, classes_to_keep, replace_urls):
+                if not process_php_file(src, dst, 2, product_name, tagline, classes_to_keep, replace_urls):
                     return
             if oto1 and oto2:
                 dst = os.path.join(html_dir, "thankyou_with_oto1_oto2.html")
-                if not process_php_file(src, dst, 12, product_name, php_title, classes_to_keep, replace_urls):
+                if not process_php_file(src, dst, 12, product_name, tagline, classes_to_keep, replace_urls):
                     return
         else:
             dst = os.path.join(html_dir, file + ".html")
-            if not process_php_file(src, dst, -1, product_name, php_title, classes_to_keep, replace_urls):
+            if not process_php_file(src, dst, -1, product_name, tagline, classes_to_keep, replace_urls):
                 return
         appendLog(f"Processed php file: {file}.php")
         advanceProgress()
