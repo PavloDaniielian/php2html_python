@@ -77,6 +77,7 @@ def process_php_file(file_path: str, new_file_path: str, dl:int, product_name: s
                         if STR_PHP_CONTENT_START in line:
                             break
                         line = re.sub(r"(<title>)(.*?)(</title>)", rf"\1{php_title}\3", line, flags=re.IGNORECASE)
+                        line = re.sub(r"PRODUCT NAME", product_name, line)
                         out_file.write(line)
                     for line in temp_file:
                         if STR_PHP_CONTENT_END in line:
@@ -235,6 +236,7 @@ def process_php_file(file_path: str, new_file_path: str, dl:int, product_name: s
                 # Insert foot part
                 if b_insert and temp_file:
                     for line in temp_file:
+                        line = re.sub(r"PRODUCT NAME", product_name, line)
                         out_file.write(line)
                     temp_file.close()
         Path(temp_file_path).unlink(missing_ok=True)  # Delete temp file
