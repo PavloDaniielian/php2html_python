@@ -108,6 +108,9 @@ class ConverterApp(QWidget):
         match = re.search(r"\$pname\s*=\s*['\"](.*?)['\"];", php_code)
         if match:
             self.product_input.setText( match.group(1) )
+        match = re.search(r"\$tag\s*=\s*['\"](.*?)['\"];", php_code)
+        if match:
+            self.tagline_input.setText( match.group(1) )
 
     def detect_replacing(self):
         file_path = f"{Path(self.php_input.text()).resolve().as_posix()}/dl.php"
@@ -153,6 +156,7 @@ class ConverterApp(QWidget):
             "Template Directory :": "This is the HTML reseller base template that will be copied over to the reseller's HTML site folder. You can create multiple base templates with different headers, footers, styles and layouts. Use tags <!-- start of reseller site --> and  <!-- end of reseller site --> to define where content should be added.",
             "HTML Directory :": "This is the reseller's HTML directory where files from the \"PHP Directory\" and \"Template Directory\" are combined. This is usually located within a folder in the PHP Directory to keep things organized.",
             "Product Name :": "This will replace any instances of \"PRODUCT NAME\" in the reseller's HTML site with the one you specify. In most cases it replaces the title tag and footer text.",
+            "Tag Line :": "This is the product tagline which will replace any instances of TAGLINE in the reseller's HTML title tags.",
             "Classes to Keep :": "This defines which custom style classes should be kept in the reseller's HTML site. For example the original h1 tag may contain custom fonts like <h1 class=\"staatliches\">Title</h1>. If \"staatliches\" is defined, then the h1 tag remains the same. If nothing is defined, then tag is stripped and becomes <h1>Title</h1>",
             "Replace Dir (detected) :": "Defines the Amazon S3 URL to strip. Performs find and replace and only adds folder and filename download link to all thankyou*.html pages. For example \"https://supersalesmachine.s3.amazonaws.com/members/supercashsavers/file.zip\" becomes \"files/file.zip\". Reseller then uploads zip files to corresponding folders. ",
             "Assign Emails :": "Looks for all broadcast emails in PHP Directory and allows you to choose which ones to use for reseller's site. Example if you have a series of broadcast*.txt emails, but broadcast3.txt is gift email, you can assign broadcast3.txt to not be copied over.",
@@ -261,6 +265,7 @@ class ConverterApp(QWidget):
         # Product Name, Classes, Replace Dir
         product_layout, self.product_input = create_text_section("Product Name :", self.config["productName"])
         self.product_input.textChanged.connect(lambda: self.onChange_ProductName())
+        tagline_layout, self.tagline_input = create_text_section("Tag Line :", "")
         classes_layout, self.classes_input = create_text_section("Classes to Keep :", self.config["classesToKeep"])
         replace_layout, self.replace_input, self.replace_urls = create_text_texts_section("Replace Dir (detected) :", self.config["replaceDir"], "Replaces URLs :", self.config["replaceLinks"])
         self.replace_input.textChanged.connect(lambda: self.onChange_ReplaceDir())
@@ -356,7 +361,7 @@ class ConverterApp(QWidget):
         self.log_output.setReadOnly(True)
         
         # Add widgets to layout
-        for section in [php_layout, template_layout, html_layout, product_layout, classes_layout, replace_layout]:
+        for section in [php_layout, template_layout, html_layout, product_layout, tagline_layout, classes_layout, replace_layout]:
             layout.addLayout(section)
         layout.addLayout(email_layout)
         layout.addLayout(email_links_layout)
@@ -446,7 +451,7 @@ class ConverterApp(QWidget):
 
         start_conversion(
             self.config["phpDir"], self.config["templateDir"], self.config["htmlDir"],
-            self.config["productName"], classesToKeep, replace_urls,
+            self.config["productName"], self.tagline_input.text().strip(), classesToKeep, replace_urls,
             self.config["emailLinksFrom"], self.config["emailLinksTo"],
             self.config["createZipFiles"]=="true", self.zip_input.text(), self.config["deleteUncompressedFiles"]=="true",
             email_map, file_copy_array_0, file_copy_array_n, file_php_array_0, file_php_array_n, file_html_array_0, file_html_array_n,
