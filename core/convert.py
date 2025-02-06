@@ -5,8 +5,7 @@ import zipfile
 import time
 import pathlib
 from pathlib import Path
-from typing import Dict
-from typing import List
+from typing import Dict, List
 from PyQt6.QtWidgets import (
     QLineEdit, QTextEdit, QMessageBox, QProgressBar, QWidget
 )
@@ -61,8 +60,8 @@ def showMessage(content: str, title: str = "Fail"):
     msg_box.exec()  # Show the message box
 
 
-def process_php_file(file_path: str, new_file_path: str, dl:int, product_name: str, classes_to_keep: str, replace_dir: str) -> bool:
-    php_file = file_path[file_path.replace('\\','/').rfind('/')+1:]
+def process_php_file(file_path: str, new_file_path: str, dl:int, product_name: str, classes_to_keep: List, replace_urls: List) -> bool:
+    php_file = file_path[file_path.rfind('\\')+1:]
     showGoing( f"Processing {php_file} ...")
     temp_file_path = f"{new_file_path}_temp"
     b_insert = Path(new_file_path).exists()
@@ -220,9 +219,15 @@ def process_php_file(file_path: str, new_file_path: str, dl:int, product_name: s
                     line = re.sub(r"PRODUCT NAME", product_name, line)
                     # Replace file paths with appropriate versions
                     str_files = "files/" if oto == 0 else "files_oto1/" if oto == 1 else "files_oto2/"
-                    line = re.sub(r"https://supersalesmachine\.s3\.amazonaws\.com/members/" + replace_dir + "/", str_files, line)
-                    line = re.sub(r"https://www\.supersalesmachine\.com/a/" + replace_dir + "/files/", str_files, line)
-                    line = re.sub(r"https://www\.supersalesmachine\.com/o/" + replace_dir + "/files/", str_files, line)
+                    for replace_url in replace_urls:
+                        line = line.replace(replace_url, str_files)
+                    # clean up
+                    line = re.sub(r'class="\s*([^"]*?)\s*"', lambda m: f'class="{m.group(1).strip()}"', line)
+                    line = re.sub(r'class="\s*"', '', line)
+                    line = re.sub(r'style="\s*([^"]*?)\s*"', lambda m: f'style="{m.group(1).strip()}"', line)
+                    line = re.sub(r'style="\s*"', '', line)
+                    line = re.sub(r'<\s+', '<', line)
+                    line = re.sub(r'\s+>', '>', line)
                     # Write modified line if not empty
                     if line.strip():
                         out_file.write(line)
@@ -238,7 +243,7 @@ def process_php_file(file_path: str, new_file_path: str, dl:int, product_name: s
         return False
 
 def process_email_file(file_path: str, new_file_path: str, email_links_from: str, email_links_to: str) -> bool:
-    email_file = new_file_path[new_file_path.replace('\\','/').rfind('/')+1:]
+    email_file = new_file_path[new_file_path.rfind('\\')+1:]
     showGoing( f"Processing {email_file} ...")
     temp_file_path = f"{new_file_path}_temp"
     if Path(new_file_path).exists():
@@ -308,12 +313,15 @@ def create_zip(zip_path: str, directory: str, filesToZip: List[str]):
                         advanceProgress()
 
 def start_conversion(php_dir: str, template_dir: str, html_dir: str,
-                      product_name: str, classes_to_keep: str,
-                      replace_dir: str,
+                      product_name: str, classes_to_keep: List,
+                      replace_urls: List,
                       email_links_from: str, email_links_to: str,
                       make_zip: bool, zip_name: str, delete_uncompressed: bool,
                       email_map: Dict[str, str], file_copy_array_0: List, file_copy_array_n: List, file_php_array_0: List, file_php_array_n: List, file_html_array_0: List, file_html_array_n: List,
                       mainWin: QWidget, progress: QProgressBar, going: QLineEdit, log_out: QTextEdit ):
+    php_dir = Path(php_dir).resolve().as_posix()
+    template_dir = Path(template_dir).resolve().as_posix()
+    html_dir = Path(html_dir).resolve().as_posix()
     if php_dir == template_dir:
         showMessage("PHP Directory and Template Directory can not be the same.")
         return
@@ -323,6 +331,9 @@ def start_conversion(php_dir: str, template_dir: str, html_dir: str,
     if template_dir == html_dir:
         showMessage("Template Directory and HTML Directory can not be the same.")
         return
+    php_dir = php_dir.replace('/', '\\')
+    template_dir = template_dir.replace('/', '\\')
+    html_dir = html_dir.replace('/', '\\')
     
     # set global variable
     global gProgressObj
@@ -431,23 +442,23 @@ def start_conversion(php_dir: str, template_dir: str, html_dir: str,
         src = os.path.join(php_dir, file+".php")
         if file == "dl":
             dst = os.path.join(html_dir, "thankyou.html")
-            if not process_php_file(src, dst, 0, product_name, classes_to_keep, replace_dir):
+            if not process_php_file(src, dst, 0, product_name, classes_to_keep, replace_urls):
                 return
             if oto1:
                 dst = os.path.join(html_dir, "thankyou_with_oto1.html")
-                if not process_php_file(src, dst, 1, product_name, classes_to_keep, replace_dir):
+                if not process_php_file(src, dst, 1, product_name, classes_to_keep, replace_urls):
                     return
             if oto2:
                 dst = os.path.join(html_dir, "thankyou_with_oto2.html")
-                if not process_php_file(src, dst, 2, product_name, classes_to_keep, replace_dir):
+                if not process_php_file(src, dst, 2, product_name, classes_to_keep, replace_urls):
                     return
             if oto1 and oto2:
                 dst = os.path.join(html_dir, "thankyou_with_oto1_oto2.html")
-                if not process_php_file(src, dst, 12, product_name, classes_to_keep, replace_dir):
+                if not process_php_file(src, dst, 12, product_name, classes_to_keep, replace_urls):
                     return
         else:
             dst = os.path.join(html_dir, file + ".html")
-            if not process_php_file(src, dst, -1, product_name, classes_to_keep, replace_dir):
+            if not process_php_file(src, dst, -1, product_name, classes_to_keep, replace_urls):
                 return
         appendLog(f"Processed php file: {file}.php")
         advanceProgress()
